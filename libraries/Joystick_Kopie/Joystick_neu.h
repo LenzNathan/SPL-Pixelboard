@@ -13,6 +13,7 @@ private:
     unsigned long entprellVerzoegerung;
     unsigned long letzteKlickZeit;
     int langerKlickCounter;
+    int firstLoopLangerKlick;
 
     int vrxPin;
     int vryPin;

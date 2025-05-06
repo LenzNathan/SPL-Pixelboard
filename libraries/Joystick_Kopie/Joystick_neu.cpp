@@ -5,6 +5,7 @@ Joystick::Joystick(int tasterPin, unsigned long entprellVerzoegerung, int vrxPin
     this->vrxPin = vrxPin;
     this->vryPin = vryPin;
 
+    firstLoopLangerKlick = true;
     tasterZustand = false;
     letzterZustand = true;
     letzteEntprellZeit = 0;
@@ -27,8 +28,13 @@ void Joystick::aktualisieren() {
     if ((millis() - letzteEntprellZeit) > entprellVerzoegerung) {
         tasterZustand = aktuellerZustand;
         if (tasterZustand && ((millis() - letzteKlickZeit) > 1000)) {
-            langerKlickCounter++;
+            if(firstLoopLangerKlick){
+                langerKlickCounter++;
+                firstLoopLangerKlick = false;
+            }
             langerKlickZustand = true;
+        }else{
+            firstLoopLangerKlick = true;
         }
         if (!tasterZustand) {
             letzteKlickZeit = millis();
