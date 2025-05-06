@@ -31,8 +31,8 @@ void Joystick::aktualisieren() {
             if(firstLoopLangerKlick){
                 langerKlickCounter++;
                 firstLoopLangerKlick = false;
-            }
             langerKlickZustand = true;
+            }
         }else{
             firstLoopLangerKlick = true;
         }
