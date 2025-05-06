@@ -6,23 +6,23 @@
 #include <mutex>
 #include <stdio.h>
 
-#include "namespace.h"
-#include "callback.h"
-#include "json.h"
-#include "ref.h"
-#include "str.h"
+#include "fl/namespace.h"
+#include "fl/callback.h"
+#include "fl/json.h"
+#include "fl/ptr.h"
+#include "fl/str.h"
 
 FASTLED_NAMESPACE_BEGIN
 
-FASTLED_SMART_REF(jsUiInternal);
+FASTLED_SMART_PTR(jsUiInternal);
 
-class jsUiInternal : public Referent {
+class jsUiInternal : public fl::Referent {
 public:
 
-    using UpdateFunction = Callback<const FLArduinoJson::JsonVariantConst&>;
-    using ToJsonFunction = Callback<FLArduinoJson::JsonObject&>;
+    using UpdateFunction = fl::Callback<const FLArduinoJson::JsonVariantConst&>;
+    using ToJsonFunction = fl::Callback<FLArduinoJson::JsonObject&>;
 
-    jsUiInternal(const Str& name, UpdateFunction updateFunc, ToJsonFunction toJsonFunc);
+    jsUiInternal(const fl::Str& name, UpdateFunction updateFunc, ToJsonFunction toJsonFunc);
     ~jsUiInternal() {
         const bool functions_exist = mUpdateFunc || mtoJsonFunc;
         if (functions_exist) {
@@ -33,7 +33,7 @@ public:
         }
     }
 
-    const Str& name() const;
+    const fl::Str& name() const;
     void update(const FLArduinoJson::JsonVariantConst& json);
     void toJson(FLArduinoJson::JsonObject& json) const;
     int id() const;
@@ -44,7 +44,7 @@ private:
     static int nextId();
     static std::atomic<uint32_t> sNextId;
     int mId;
-    Str mName;
+    fl::Str mName;
     UpdateFunction mUpdateFunc;
     ToJsonFunction mtoJsonFunc;
     mutable std::mutex mMutex;

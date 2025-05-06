@@ -1,9 +1,10 @@
 #ifdef __EMSCRIPTEN__
 
-#include "namespace.h"
+#include "fl/namespace.h"
 
 #include "ui_internal.h"
 
+using namespace fl;
 
 FASTLED_NAMESPACE_BEGIN
 

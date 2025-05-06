@@ -29,6 +29,9 @@ def compile_for_board_and_example(
 ) -> tuple[bool, str]:
     """Compile the given example for the given board."""
     global ERROR_HAPPENED  # pylint: disable=global-statement
+    if board.board_name == "web":
+        locked_print(f"Skipping web target for example {example}")
+        return True, ""
     board_name = board.board_name
     use_pio_run = board.use_pio_run
     real_board_name = board.get_real_board_name()
@@ -45,6 +48,16 @@ def compile_for_board_and_example(
     locked_print(f"*** Building example {example} for board {board_name} ***")
     cwd: str | None = None
     shell: bool = False
+    # Copy all files from the example directory to the "src" directory
+    for src_file in example.rglob("*"):
+        if src_file.is_file():
+            src_dir = src_file.parent
+            path = src_dir.relative_to(example)
+            dst_dir = srcdir / path
+            os.makedirs(dst_dir, exist_ok=True)
+            locked_print(f"Copying {src_file} to {dst_dir / src_file.name}")
+            os.makedirs(srcdir, exist_ok=True)
+            shutil.copy(src_file, dst_dir / src_file.name)
     # libs = ["src", "ci"]
     if use_pio_run:
         # we have to copy a few folders of pio ci in order to get this to work.
@@ -54,11 +67,7 @@ def compile_for_board_and_example(
             build_lib = builddir / "lib" / lib
             shutil.rmtree(build_lib, ignore_errors=True)
             shutil.copytree(project_libdir, build_lib)
-        # Copy all files from the example directory to the "src" directory
-        for src_file in example.rglob("*"):
-            if src_file.is_file():
-                locked_print(f"Copying {src_file} to {srcdir / src_file.name}")
-                shutil.copy(src_file, srcdir / src_file.name)
+
         cwd = str(builddir)
         cmd_list = [
             "pio",
