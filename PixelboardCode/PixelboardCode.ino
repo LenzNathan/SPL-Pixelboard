@@ -26,7 +26,7 @@ void setup() {
     ,
     2  // Priority
     ,
-    &handle_a  
+    &handle_a
   );
   xTaskCreate(
     TaskB, "TaskB"  //name
@@ -37,9 +37,8 @@ void setup() {
     ,
     2  // Priority
     ,
-    &handle_b  
+    &handle_b
   );
-  vTaskSuspend(handle_a);
   vTaskSuspend(handle_b);
 }
 
@@ -51,7 +50,7 @@ void loop() {
   bool tasterGedrueckt = taster.istGedrueckt();
   //Serial.print("Taster ist ");
   //Serial.println(tasterGedrueckt ? "gedrückt" : "nicht gedrückt");
-
+  
   // Überprüfe auf langen Klick
   if (taster.LangerKlick()) {
     Serial.println("Langer Klick erkannt!");
