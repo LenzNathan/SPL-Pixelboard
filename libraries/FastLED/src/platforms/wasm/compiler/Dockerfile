@@ -42,21 +42,44 @@
 # This will be set to arm64 to support MacOS M1+ devices (and Linux-based arm64 devices)
 ARG PLATFORM_TAG=""
 
-# Emscripten base image, we will use this to copy the files into the host container.
-FROM emscripten/emsdk:3.1.70${PLATFORM_TAG} AS emscripten_base
+# Use only Emscripten base image
+FROM emscripten/emsdk:3.1.70${PLATFORM_TAG}
 
-# Target base image that performs the actual compilation
-FROM fedora
 
-# Copy pre-compiled content of Emscripten SDK to target image
-COPY --from=emscripten_base /emsdk /emsdk
+ENV DEBIAN_FRONTEND=noninteractive
 
-# To increase build speed, we use a parallel downloads for the dnf installer.
-RUN echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf
+# Update the apt-get package list. This takes a long time, so we do it first to maximize cache hits.
+# Also install apt-fast first
+RUN apt-get update
 
-# Standard tools needed to actually us this container
-RUN dnf install -y git awk nano which ca-certificates python3 python3-pip dos2unix tar wget unzip make cmake ninja-build ccache zlib zlib-devel gcc gcc-c++ && \
-    dnf clean all
+RUN apt-get install -y software-properties-common
+
+RUN add-apt-repository ppa:apt-fast/stable -y && \
+    apt-get update && \
+    apt-get -y install apt-fast
+
+# Update apt and install required packages
+RUN apt-fast install -y \
+    git \
+    gawk \
+    nano \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    dos2unix \
+    tar \
+    wget \
+    unzip \
+    make \
+    cmake \
+    ninja-build \
+    ccache \
+    zlib1g \
+    zlib1g-dev \
+    gcc \
+    g++ \
+    rsync \
+    && rm -rf /var/lib/apt/lists/*
 
 
 # /container/bin contains symbolic links to python3 and pip3 as python and pip that we use for the compiler.
@@ -64,9 +87,6 @@ RUN mkdir -p /container/bin && \
     ln -s /usr/bin/python3 /container/bin/python && \
     ln -s /usr/bin/pip3 /container/bin/pip
 
-# Get the compiler requirements and install them.
-COPY src/platforms/wasm/compiler/requirements.txt /install/requirements.txt
-RUN pip install -r /install/requirements.txt
 
 # Add Python and Emscripten to PATH
 ENV PATH="/container/bin:/usr/local/bin:/usr/bin:/emsdk:/emsdk/upstream/emscripten:${PATH}"
@@ -98,79 +118,80 @@ RUN echo 'export LANG=en_US.UTF-8' >> /etc/profile && \
 # isn't wasm.
 #COPY src/platforms/wasm/compiler/install-arduino-cli.sh /install-arduino-cli.sh
 #RUN chmod +x /install-arduino-cli.sh && /install-arduino-cli.sh || echo "Failed to install Arduino CLI"
-    
 
-# Set up the entrypoint script
-RUN echo '#!/bin/bash' > /entrypoint.sh && \
-    echo 'source /emsdk/emsdk_env.sh' >> /entrypoint.sh && \
-    echo 'exec "$@"' >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+RUN pip install uv==0.5.6
+
+# Get the compiler requirements and install them.
+COPY src/platforms/wasm/compiler/requirements.txt /install/requirements.txt
+RUN uv pip install --system -r /install/requirements.txt
+
+RUN pio settings set check_platformio_interval 9999
+RUN pio settings set enable_telemetry 0
 
 # FIRST PRE-WARM CYCLE and initial setup: Download the fastled repo from the github and pre-warm the cache with a compilation.
 # This is by far the most expensive part of the build, because platformio needs to download initial tools. This
 # pre-warm cycle is "sticky" and tends to stay in the cache for a long time since docker is very relaxed about
 # invalidating cache layers that clone a github repo.
-RUN git clone https://github.com/fastled/FastLED.git /js/fastled
 
-RUN dos2unix /js/fastled/src/platforms/wasm/compiler/*.sh && \
-    chmod +x /js/fastled/src/platforms/wasm/compiler/*.sh && \
-    dos2unix /js/fastled/src/platforms/wasm/compiler/*.py
-    
+ARG FASTLED_VERSION=master
+ENV FASTLED_VERSION=${FASTLED_VERSION}
+RUN git clone -b ${FASTLED_VERSION} https://github.com/fastled/FastLED.git --depth 1 /git/fastled && \
+    mkdir -p /js/fastled && \
+    rsync -a /git/fastled/ /js/fastled/ --exclude='.git'
+
 # Create symlinks for wasm platform files.
-RUN ln -s /js/fastled/src/platforms/wasm/compiler/platformio.ini /js/platformio.ini && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/wasm_compiler_flags.py /js/wasm_compiler_flags.py && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/index.html /js/index.html && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/index.css /js/index.css && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/Arduino.h /js/Arduino.h && \
-    for file in /js/fastled/src/platforms/wasm/compiler/*.js; do ln -s "$file" /js/$(basename "$file"); done && \
-    for file in /js/fastled/src/platforms/wasm/compiler/*.sh; do ln -s "$file" /js/$(basename "$file"); done && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/compile.py /js/compile.py && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/run.py /js/run.py && \
-    ln -s /js/fastled/src/platforms/wasm/compiler/server.py /js/server.py
-
-RUN ln -s /js/fastled/examples /js/examples
-
-COPY src/platforms/wasm/compiler/prewarm.sh /prewarm.sh
-RUN chmod +x /prewarm.sh && dos2unix /prewarm.sh
+COPY src/platforms/wasm/compiler/init_runtime.py /js/init_runtime.py
+COPY src/platforms/wasm/compiler/prewarm.sh /js/prewarm.sh
 
 WORKDIR /js
 
-ARG PREWARM="true"
-ENV PREWARM=${PREWARM}
+ARG NO_PREWARM=0
+ENV NO_PREWARM=${NO_PREWARM}
 
-# NOW DO THE 1st PRE-WARM CYCLE
-# Prewarm the ccache with a first compile and also give a chance for
-# platformio to install the required tools.
-RUN /prewarm.sh
+RUN python /js/init_runtime.py || true
+
+
+# First pre-warm cycle - always do it as part of the build.
+RUN mkdir -p /logs
+
+# Force a build if the compiler flags change.
+COPY src/platforms/wasm/compiler/wasm_compiler_flags.py /trash/wasm_compiler_flags.py
+COPY src/platforms/wasm/compiler/CMakeLists.txt /trash/CMakeLists.txt
+RUN rm -rf /trash
+
+RUN chmod +x /js/prewarm.sh && \
+    cat /js/prewarm.sh >> /logs/prewarm.log.0
+RUN /js/prewarm.sh --force >> /logs/prewarm.log.1 || true
+
+
+# Copy the fastled repo from the host machine and prepare for pre-warm
+# Make sure and delete files that have been removed so that we don't get
+# duplicate symbols from stale files.
+COPY *.json /host/fastled/
+COPY src/*.* /host/fastled/src/
+COPY examples /host/fastled/examples
+COPY src/fx /host/fastled/src/fx
+COPY src/fl /host/fastled/src/fl
+COPY src/lib8tion /host/fastled/src/lib8tion
+COPY src/third_party /host/fastled/src/third_party
+COPY src/sensors /host/fastled/src/sensors
+COPY src/platforms /host/fastled/src/platforms
+
+COPY src/platforms/wasm/compiler/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && dos2unix /entrypoint.sh
+
+# now sync local to the source directory.
+RUN rsync -av /host/fastled/ /js/fastled/ && rm -rf /host/fastled
+
+RUN python /js/init_runtime.py || true
 
 
 # SECOND PRE-WARM CYCLE: Copy the fastled repo from the host machine and pre-warm the cache with that compilation. This will
 # be much quicker than the first pre-warm cycle.
+RUN /js/prewarm.sh --force > /logs/prewarm.log.2 || true
 
-# In order to speed up the build, copy files that are not likely
-# to be changed first.
-COPY ./*.json /js/fastled/
-COPY ./*.properties /js/fastled/
-COPY ./src/*.* /js/fastled/src/
-COPY ./src/fx/ /js/fastled/src/fx/
-COPY ./src/lib8tion/ /js/fastled/src/lib8tion
-COPY ./src/third_party/ /js/fastled/src/third_party
-
-COPY examples /examples
-
-# Create required directories
-RUN mkdir -p /mapped /examples/wasm
-
-# Copy platforms directory separately, since it changes a lot during development
-COPY ./src/platforms/ /js/fastled/src/platforms/
-
-RUN dos2unix /js/fastled/src/platforms/wasm/compiler/*.sh && \
-    chmod +x /js/fastled/src/platforms/wasm/compiler/*.sh && \
-    dos2unix /js/fastled/src/platforms/wasm/compiler/*.py
-
-# Pre-warm with a second compile with updated files.
-RUN /prewarm.sh
-# Okay that it's, we are ready to do fast compiles now.
+# Now timestamp the image and store it at the end of the build.
+RUN date > /image_timestamp.txt
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "/js/run.py", "compile"]
+CMD ["python", "/js/run.py", "server"]
