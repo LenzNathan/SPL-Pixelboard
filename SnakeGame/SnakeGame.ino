@@ -55,6 +55,7 @@ struct Position {
 
 Position apple = Position{ random(1, 15), random(1, 30) };
 Direction snakeDir = Direction::none;
+Direction newDir = Direction::none;
 int snakeMoveDelay = 500;
 unsigned long lastSnakeMove = 0;
 std::vector<Position> snake;
@@ -79,18 +80,19 @@ void loop() {
   taster.aktualisieren();
   if (!gameover) {                                            //make the Game run
     if (taster.getX() > 4094 && snakeDir != Direction::up) {  //the x - Axis of the joystick is like the Matrix inverted y axis
-      snakeDir = Direction::down;
+      newDir = Direction::down;
     }
     if (taster.getX() <= 1 && snakeDir != Direction::down) {  //this is why we have that logic here
-      snakeDir = Direction::up;
+      newDir = Direction::up;
     }
     if (taster.getY() > 4094 && snakeDir != Direction::right) {
-      snakeDir = Direction::left;
+      newDir = Direction::left;
     }
     if (taster.getY() <= 1 && snakeDir != Direction::left) {
-      snakeDir = Direction::right;
+      newDir = Direction::right;
     }
-    if (snakeDir != Direction::none && millis() - lastSnakeMove > snakeMoveDelay) {
+    if (millis() - lastSnakeMove > snakeMoveDelay) {
+      snakeDir = newDir;
       lastSnakeMove = millis();
       switch (snakeDir) {
         case Direction::up:
@@ -122,17 +124,32 @@ void loop() {
     }
     //draw apple
     setLed(apple.x, apple.y, 200, 255, 255);
+
+    if (snake[0].x == apple.x && snake[0].y == apple.y) {
+      snake.push_back(snake[snake.size() - 1]);  //den Letzten Schlangenpixel ein weiteres mal hinzufügen
+      newApple();
+    }
   }
 
-  if (snake[0].x > 30 || snake[0].x < 1 || snake[0].y > 14 || snake[0].y < 1) {
-    setBorder(255, 255, 255);  //red
+  if (snake[0].x > 30 || snake[0].x < 1 || snake[0].y > 14 || snake[0].y < 1) {  // check if the Snake crashed into the borders
     gameover = true;
+  }
+
+  for (int i = 1; i < snake.size(); i++) {  // check wether the snake crashed into itself
+    if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
+      setLed(snake[0].x, snake[0].y, 255, 255, 255);
+      gameover = true;
+    }
+  }
+
+  if (gameover) {              //action on gameover
+    setBorder(255, 255, 255);  //red
   }
 
   FastLED.show();  //DAS DELAY IST WICHTIG! - ansonsten gibts probleme mit Taster.aktualisieren
   delay(10);       //da er den AD wandler benötigt und Fastled.show unterbrechen / stören könnte (glitches entstehen bei der Bildausgabe)
 
-  if (taster.istGedrueckt()) {
+  if (gameover && taster.istGedrueckt()) {
     resetGame();
     gameover = false;
   }
@@ -207,15 +224,18 @@ void resetGame() {
   snake.push_back({ 16, 7 });
   snakeMoveDelay = 500;
   snakeDir = Direction::none;
-  apple = Position{ random(1, 30), random(1, 15) };
+  newDir = Direction::none;
+  newApple();
 }
 
 void newApple() {
   bool granted = false;
-   while (!granted) {
+  while (!granted) {
+    apple = Position{ random(1, 30), random(1, 15) };
+    granted = true;
     for (int i = 0; i < snake.size(); i++) {
-      if(apple.x != snake[i].x && apple.y != snake[i].y){
-
+      if (apple.x == snake[i].x && apple.y == snake[i].y) {
+        granted = false;
       }
     }
   }
