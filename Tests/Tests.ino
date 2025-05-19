@@ -20,7 +20,7 @@ CRGB leds_plus_safety_pixel[TOTAL_LED_COUNT + 2];
 CRGB* const ledsUpper(leds_plus_safety_pixel + 1);
 CRGB* const ledsLower(leds_plus_safety_pixel + 1 + TOTAL_LED_COUNT / 2);
 
-
+int i = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -30,38 +30,19 @@ void setup() {
   FastLED.addLeds<CHIPSET, LED_PIN_LOWER, COLOR_ORDER>(ledsLower, TOTAL_LED_COUNT / 2).setCorrection(TypicalSMD5050);
   FastLED.setBrightness(BRIGHTNESS);
 }
-
 void loop() {
-  for (int i = 15; i >= 0; i--) {
-    whiteUp(i);
-    FastLED.show();
-    delay(50);
-    clear();
-    FastLED.show();
-  }
+  delay(20);
+  clear();
+  setLed(5, 5, i, 255, 255);
+  i++;
+  LEDS.show();
 }
-
-void whiteUp(int startheight) {
-  for (int y = 0; startheight + y < 16; y++) {
-    for (int x = 0; x < 32; x++) {
-      setLed(x, y + startheight, x * 8, 255 - y * 16, 255);
-    }
-  }
-}
-void blackUp(int startheight) {
-  for (int y = 0; startheight + y < 16; y++) {
-    for (int x = 0; x < 32; x++) {
-      setLed(x, y, x * 8, 255, 255 - y * 16);
-    }
-  }
-}
-
 
 
 
 void setLed(int x, int y, int H, int S, int V) {
-  if (y >= 16 || x >= 32) {  //if we are out of range
-    Serial.println("--- INDEX OUT OF RANGE ---");
+  if (y >= 16 || x >= 32 || y < 0 || x < 0) {  //if we are out of range
+    //Serial.println("--- INDEX OUT OF RANGE ---");
     return;
   }
 
