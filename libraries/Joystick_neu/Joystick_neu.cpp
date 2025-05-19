@@ -1,9 +1,10 @@
 #include "Joystick_neu.h"
 
-Joystick::Joystick(int tasterPin, unsigned long entprellVerzoegerung, int vrxPin, int vryPin) {
+Joystick::Joystick(int tasterPin, unsigned long entprellVerzoegerung, int vrxPin, int vryPin, bool invertJoystickCoordinates) {
     this->tasterPin = tasterPin;
     this->vrxPin = vrxPin;
     this->vryPin = vryPin;
+    this->invertJoystickCoordinates = invertJoystickCoordinates;
 
     firstLoopLangerKlick = true;
     tasterZustand = false;
@@ -62,9 +63,17 @@ int Joystick::getLangerKlickCounter() {
 }
 
 int Joystick::getX() {
-    return xKoordinate;
+    if(!invertJoystickCoordinates){
+        return xKoordinate;
+    }else{
+        return 4095 - xKoordinate;
+    }
 }
 
 int Joystick::getY() {
-    return yKoordinate;
+    if(!invertJoystickCoordinates){
+        return yKoordinate;
+    }else{
+        return 4095 - yKoordinate;
+    }
 }

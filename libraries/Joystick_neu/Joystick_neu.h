@@ -1,5 +1,5 @@
-#ifndef JOYSTICK_H
-#define JOYSTICK_H
+#ifndef JOYSTICK_NEU_H
+#define JOYSTICK_NEU_H
 
 #include <Arduino.h>
 
@@ -19,9 +19,10 @@ private:
     int vryPin;
     int xKoordinate;
     int yKoordinate;
+    bool invertJoystickCoordinates;
 
 public:
-    Joystick(int tasterPin, unsigned long entprellVerzoegerung = 50, int vrxPin = 34, int vryPin = 35);
+    Joystick(int tasterPin, unsigned long entprellVerzoegerung = 50, int vrxPin = 34, int vryPin = 35, bool invertJoystickCoordinates = false);
     void aktualisieren();
     bool istGedrueckt();
     bool LangerKlick();

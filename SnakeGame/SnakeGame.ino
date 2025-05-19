@@ -32,11 +32,12 @@ CRGB* const ledsLower(ledsRawLower + 1);
 #define tasterPin 32
 #define xPin 34
 #define yPin 35
+#define joystickInverted true
 
 // Instanz der entprellten Tasterklasse
-Joystick taster(tasterPin, 50, xPin, yPin);
+Joystick taster(tasterPin, 50, xPin, yPin, joystickInverted);
 
-//Game Vars
+// ---------------------------------- Game Vars ---------------------------------- //
 
 bool gameover = false;
 
@@ -53,15 +54,55 @@ struct Position {
   int y;
 };
 
+struct Color {
+  int H;
+  int S;
+  int V;
+};
+
+
 Position apple = Position{ random(1, 15), random(1, 30) };
 Direction snakeDir = Direction::none;
 Direction newDir = Direction::none;
-int snakeMoveDelay = 500;
+int snakeMoveDelay = 250;
 unsigned long lastSnakeMove = 0;
 std::vector<Position> snake;
+Color snakeHead = Color{
+  150, 255, 255
+};
+Color snakeBody = Color{
+  125, 255, 255
+};
 //das Spielfeld wurde auf:
 //Y: 1-14, X: 1-30 eingeschränkt
 
+//für das Punktesystem:
+int movementPoints = 0;
+Color movementPointColor = Color{
+  60, 255, 255
+};
+int movementSkillPoints = 0;
+Color movementSkillPointColor = Color{
+  60, 255, 150
+};
+int applePoints = 0;
+Color applePointColor = Color{
+  105, 255, 255
+};
+int appleSkillPoints = 0;
+Color appleSkillPointColor = Color{
+  105, 255, 150
+};
+
+int legendaryPoints = 0;
+Color legendary = Color{ // updaten --> Regenbogen
+                         0, 255, 255
+};
+
+
+Color white = Color{
+  0, 0, 255
+};
 
 void setup() {
   randomSeed(analogRead(0));
@@ -88,9 +129,10 @@ void loop() {
     if (taster.getY() > 4094 && snakeDir != Direction::right) {
       newDir = Direction::left;
     }
-    if (taster.getY() <= 1 && snakeDir != Direction::left) {
+    if (taster.getY() <= 1 && snakeDir != Direction::left && snakeDir != Direction::none) {  //after reset --> Status none, we may not move right (because the snake looks left)
       newDir = Direction::right;
     }
+    //move Snake
     if (millis() - lastSnakeMove > snakeMoveDelay) {
       snakeDir = newDir;
       lastSnakeMove = millis();
@@ -116,18 +158,22 @@ void loop() {
           snake.pop_back();
           break;
       }
+      if (snakeDir != Direction::none) {  //nur wenn wir wirklich gefahren sind
+        setBorderPoints(true, false);     //einen movement point geben und anzeigen
+      }
     }
     //draw Snake
-    setLed(snake[0].x, snake[0].y, 150, 255, 255);
+    setLed(snake[0].x, snake[0].y, snakeHead.H, snakeHead.S, snakeHead.V);
     for (int i = 1; i < snake.size(); i++) {
-      setLed(snake[i].x, snake[i].y, 125, 255, 255);
+      setLed(snake[i].x, snake[i].y, snakeBody.H, snakeBody.S, snakeBody.V);
     }
     //draw apple
-    setLed(apple.x, apple.y, 200, 255, 255);
-
+    setLed(apple.x, apple.y, applePointColor.H, applePointColor.S, applePointColor.V);
+    //apfel essen
     if (snake[0].x == apple.x && snake[0].y == apple.y) {
       snake.push_back(snake[snake.size() - 1]);  //den Letzten Schlangenpixel ein weiteres mal hinzufügen
       newApple();
+      setBorderPoints(false, true);
     }
   }
 
@@ -142,8 +188,8 @@ void loop() {
     }
   }
 
-  if (gameover) {              //action on gameover
-    setBorder(255, 255, 255);  //red
+  if (gameover) {                //action on gameover
+    reSetBorder(255, 255, 255);  //red
   }
 
   FastLED.show();  //DAS DELAY IST WICHTIG! - ansonsten gibts probleme mit Taster.aktualisieren
@@ -200,7 +246,100 @@ void setLed(int x, int y, int H, int S, int V) {
   }
 }
 
-void setBorder(int H, int S, int V) {
+void setBorderPoints(bool incrementMovementPoints, bool incrementApplePoints) {
+  if (incrementMovementPoints) {
+    movementPoints++;
+  }
+  if (incrementApplePoints) {
+    applePoints++;
+  }
+  if (movementPoints >= 23) {
+    movementPoints = 0;
+    movementSkillPoints++;
+    applePoints++;
+  }
+  if (applePoints >= 23) {
+    applePoints = 0;
+    appleSkillPoints++;
+  }
+  if (movementSkillPoints >= 23) {
+    movementSkillPoints = 0;
+    appleSkillPoints++;
+  }
+  if (appleSkillPoints >= 23) {
+    appleSkillPoints = 0;
+
+    legendaryPoints++;
+    //reset stuff and give snake upgrade
+  }
+
+
+  //left upper (apple)
+  for (int y = 8; y < 16; y++) {
+    if (applePoints > y - 8) {
+      setLed(0, y, applePointColor.H, applePointColor.S, applePointColor.V);
+    } else {
+      setLed(0, y, white.H, white.S, white.V);
+    }
+  }
+  for (int x = 1; x < 15; x++) {
+    if (applePoints > x + 7) {
+      setLed(x, 15, applePointColor.H, applePointColor.S, applePointColor.V);
+    } else {
+      setLed(x, 15, white.H, white.S, white.V);
+    }
+  }
+
+  // left lower (movement)
+  for (int y = 7; y >= 0; y--) {
+    if (movementPoints > 7 - y) {
+      setLed(0, y, movementPointColor.H, movementPointColor.S, movementPointColor.V);
+    } else {
+      setLed(0, y, white.H, white.S, white.V);
+    }
+  }
+  for (int x = 1; x < 15; x++) {
+    if (movementPoints > x + 7) {
+      setLed(x, 0, movementPointColor.H, movementPointColor.S, movementPointColor.V);
+    } else {
+      setLed(x, 0, white.H, white.S, white.V);
+    }
+  }
+
+  //right upper (apple skill)
+  for (int x = 15; x < 31; x++) {
+    if (appleSkillPoints > x - 15) {
+      setLed(x, 15, appleSkillPointColor.H, appleSkillPointColor.S, appleSkillPointColor.V);
+    } else {
+      setLed(x, 15, white.H, white.S, white.V);
+    }
+  }
+  for (int y = 15; y >= 8; y--) {
+    if (appleSkillPoints > 31 - y) {
+      setLed(31, y, appleSkillPointColor.H, appleSkillPointColor.S, appleSkillPointColor.V);
+    } else {
+      setLed(31, y, white.H, white.S, white.V);
+    }
+  }
+
+  //right lower (movement skill)
+  for (int x = 15; x < 31; x++) {
+    if (movementSkillPoints > x - 15) {
+      setLed(x, 0, movementSkillPointColor.H, movementSkillPointColor.S, movementSkillPointColor.V);
+    } else {
+      setLed(x, 0, white.H, white.S, white.V);
+    }
+  }
+  for (int y = 0; y < 8; y++) {
+    if (movementSkillPoints > y + 15) {
+      setLed(31, y, movementSkillPointColor.H, movementSkillPointColor.S, movementSkillPointColor.V);
+    } else {
+      setLed(31, y, white.H, white.S, white.V);
+    }
+  }
+}
+
+void reSetBorder(int H, int S, int V) {
   for (int y = 0; y < 16; y++) {
     setLed(0, y, H, S, V);
   }
@@ -217,14 +356,18 @@ void setBorder(int H, int S, int V) {
 
 void resetGame() {
   FastLED.clear();
-  setBorder(0, 0, 255);
+  reSetBorder(0, 0, 255);
   snake.clear();
   snake.push_back({ 14, 7 });
   snake.push_back({ 15, 7 });
   snake.push_back({ 16, 7 });
-  snakeMoveDelay = 500;
+  snakeMoveDelay = 250;
   snakeDir = Direction::none;
   newDir = Direction::none;
+  movementPoints = 0;
+  movementSkillPoints = 15;
+  applePoints = 0;
+  appleSkillPoints = 15;
   newApple();
 }
 
@@ -237,6 +380,14 @@ void newApple() {
       if (apple.x == snake[i].x && apple.y == snake[i].y) {
         granted = false;
       }
+    }
+  }
+}
+
+void whiteUp(int startheight) {
+  for (int x = 0; x < 32; x++) {
+    for (int y = startheight; y + startheight < 16; y++) {
+      setLed(x, y, x * 8, 255 - y * 16, 255);
     }
   }
 }
