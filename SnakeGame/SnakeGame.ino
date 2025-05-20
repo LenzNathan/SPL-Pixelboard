@@ -100,7 +100,6 @@ int legendaryColorUpdateTime = 50;
 unsigned long legendaryColorUpdateTimer = 0;
 
 void setup() {
-  randomSeed(analogRead(0));
   Serial.begin(9600);
   delay(1000);
   Serial.println("BEGINNING");
@@ -182,12 +181,14 @@ void loop() {
 
     if (snake[0].x > 30 || snake[0].x < 1 || snake[0].y > 14 || snake[0].y < 1) {  // check if the Snake crashed into the borders
       gameover = true;
+      printScore();
     }
 
     for (int i = 1; i < snake.size(); i++) {  // check wether the snake crashed into itself
       if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
         setLed(snake[0].x, snake[0].y, red);
         gameover = true;
+        printScore();
         snakeOnSelf = true;
       }
     }
@@ -431,6 +432,7 @@ void resetSnake() {
 }
 
 void newApple() {
+  randomSeed(analogRead(0));
   bool granted = false;
   while (!granted) {
     apple = Position{ random(1, 30), random(1, 15) };
@@ -481,6 +483,7 @@ void rainbowWhiteTransition() {
   }
   delay(500);
 }
+
 void whiteUp(int startheight) {
   for (int y = 0; y < 16; y++) {
     for (int x = 0; x < 32; x++) {
@@ -488,6 +491,7 @@ void whiteUp(int startheight) {
     }
   }
 }
+
 void whiteUpInverted(int startheight) {
   for (int y = 0; y < 16; y++) {
     for (int x = 0; x < 32; x++) {
@@ -495,10 +499,36 @@ void whiteUpInverted(int startheight) {
     }
   }
 }
+
 void clear() {
   for (int x = 0; x < 32; x++) {
     for (int y = 0; y < 16; y++) {
       setLed(x, y, black);
     }
   }
+}
+
+void printScore() {
+  String begin = (String)(calculateScore());
+  int dotsNeeded = begin.length() / 3;
+  if (begin.length() % 3 == 0) {
+    dotsNeeded--;
+  }
+
+  String result = "";
+  while (dotsNeeded > 0) {
+    result = " " + begin.substring(begin.length() - 3) + "" + result;
+    begin = begin.substring(0, begin.length() - 3);
+    dotsNeeded--;
+  }
+
+  result = begin + "" + result;
+  Serial.println("+-------------------------------+");
+  Serial.print("| Score: \t");
+  Serial.println(result);
+  Serial.println("+-------------------------------+");
+}
+
+int calculateScore() {
+  return (5 * movementPoints + 10 * 20 * movementSkillPoints + 50 * 20 * applePoints + 100 * 20 * 20 * appleSkillPoints + 500 * 20 * 20 * 20 * legendaryPoints);
 }
