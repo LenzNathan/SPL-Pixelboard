@@ -40,7 +40,7 @@ Joystick taster(tasterPin, 50, xPin, yPin, joystickInverted);
 // ---------------------------------- Game Vars ---------------------------------- //
 
 bool gameover = false;
-int gameoverBlinkPointDelay = 4000;
+int gameoverBlinkPointDelay = 3000;
 unsigned long gameoverBlinkTimer = 0;
 bool gameoverPointScreen = true;
 bool snakeOnSelf = false;
@@ -113,6 +113,7 @@ void setup() {
 }
 
 void loop() {
+  bool tasterLastState = taster.istGedrueckt();
   taster.aktualisieren();
   if (millis() - legendaryColorUpdateTimer > legendaryColorUpdateTime) {  //Farbe updaten
     legendaryColorUpdateTimer = millis();
@@ -192,10 +193,18 @@ void loop() {
     }
 
   } else {  //action on gameover
-    if (millis() - gameoverBlinkTimer > gameoverBlinkPointDelay) {
-      gameoverBlinkTimer = millis();
-      gameoverPointScreen = !gameoverPointScreen;  // wir wollen ja das nächste mal den anderen Status Zeigen :)
+    if (gameoverPointScreen) {
+      if (millis() - gameoverBlinkTimer > gameoverBlinkPointDelay) {
+        gameoverBlinkTimer = millis();
+        gameoverPointScreen = !gameoverPointScreen;  // wir wollen ja das nächste mal den anderen Status Zeigen :)
+      }
+    } else {
+      if (millis() - gameoverBlinkTimer > gameoverBlinkPointDelay / 3) {
+        gameoverBlinkTimer = millis();
+        gameoverPointScreen = !gameoverPointScreen;  // wir wollen ja das nächste mal den anderen Status Zeigen :)
+      }
     }
+
     drawScreen();
     if (gameoverPointScreen) {
       setBorderPoints(false, false);
@@ -215,7 +224,7 @@ void loop() {
   FastLED.show();  //DAS DELAY IST WICHTIG! - ansonsten gibts probleme mit Taster.aktualisieren
   delay(10);       //da er den AD wandler benötigt und Fastled.show unterbrechen / stören könnte (glitches entstehen bei der Bildausgabe)
 
-  if (gameover && taster.istGedrueckt()) {
+  if (gameover && !tasterLastState && taster.istGedrueckt()) {
     resetGame(false);
     gameover = false;
   }
