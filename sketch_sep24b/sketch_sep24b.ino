@@ -1,16 +1,27 @@
 #include <WiFi.h>
 #include <time.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_NeoMatrix.h>
+#include <Adafruit_NeoPixel.h>
 
 // WLAN-Zugangsdaten
-const char* wlanName = "Selbst eingeben :)";
-const char* wlanPasswort = "Selbst eingeben :)";
+const char* wlanName = "DEIN_WIFI_NAME";
+const char* wlanPasswort = "DEIN_WIFI_PASSWORT";
 
 // NTP-Server und Zeitzone
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffsetInSeconds = 3600;      // GMT+1 (MEZ)
-const int daylightOffsetInSeconds = 3600;  // Sommerzeit
+const long gmtOffset = 3600;       // GMT+1 (MEZ)
+const int daylightOffset = 3600;   // Sommerzeit
 
-// Initialisierung
+// LED-Matrix Setup (16 hoch, 32 breit)
+#define PIN_MATRIX 25
+
+Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(
+  32, 16, PIN_MATRIX,
+  NEO_MATRIX_TOP + NEO_MATRIX_LEFT + NEO_MATRIX_ROWS + NEO_MATRIX_ZIGZAG,
+  NEO_GRB + NEO_KHZ800
+);
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
@@ -18,16 +29,19 @@ void setup() {
   verbindeMitWLAN();
   konfiguriereZeit();
 
-  Serial.println("Initialisierung abgeschlossen.");
+  matrix.begin();
+  matrix.setBrightness(20);  // Helligkeit (0–255)
+  matrix.setTextWrap(false);
+  matrix.setTextColor(matrix.Color(0, 255, 0));  // Grün
+  matrix.fillScreen(0);
+  matrix.show();
 }
 
-// Hauptloop
 void loop() {
-  zeigeAktuelleZeit();
-  delay(10000);  // Alle 10 Sekunden aktualisieren
+  zeigeZeitAufMatrix();
+  delay(1000);  // Jede Sekunde aktualisieren
 }
 
-// Verbindung mit dem WLAN herstellen
 void verbindeMitWLAN() {
   Serial.print("Verbinde mit WLAN: ");
   Serial.println(wlanName);
@@ -40,30 +54,35 @@ void verbindeMitWLAN() {
   }
 
   Serial.println("\nWLAN verbunden.");
-  Serial.print("IP-Adresse: ");
+  Serial.print("IP: ");
   Serial.println(WiFi.localIP());
 }
 
-// Zeit vom NTP-Server konfigurieren
 void konfiguriereZeit() {
-  configTime(gmtOffsetInSeconds, daylightOffsetInSeconds, ntpServer);
+  configTime(gmtOffset, daylightOffset, ntpServer);
   Serial.println("Zeitkonfiguration abgeschlossen.");
 }
 
-// Aktuelle Zeit ausgeben
-void zeigeAktuelleZeit() {
+void zeigeZeitAufMatrix() {
   struct tm zeitinfo;
 
   if (!getLocalTime(&zeitinfo)) {
-    Serial.println("Fehler beim Abrufen der Zeit.");
+    Serial.println("Zeitabruf fehlgeschlagen.");
     return;
   }
 
-  char zeichenkette[64];
-  strftime(zeichenkette, sizeof(zeichenkette),
-           "%A, %d.%m.%Y %H:%M:%S", &zeitinfo);
+  // Zeit formatieren (HH:MM)
+  char uhrzeit[6];
+  snprintf(uhrzeit, sizeof(uhrzeit), "%02d:%02d",
+           zeitinfo.tm_hour, zeitinfo.tm_min);
 
-  Serial.print("Aktuelle Zeit: ");
-  Serial.println(zeichenkette);
+  // Ausgabe im Seriellen Monitor
+  Serial.print("Uhrzeit: ");
+  Serial.println(uhrzeit);
+
+  // Anzeige auf Matrix
+  matrix.fillScreen(0);
+  matrix.setCursor(1, 4);  // X,Y-Position für zentrierten Text
+  matrix.print(uhrzeit);
+  matrix.show();
 }
-K
