@@ -1,82 +1,88 @@
-#include <FastLED.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
 
-#define LED_PIN_UPPER 25
-#define LED_PIN_LOWER 26
+// WLAN-Zugangsdaten
+const char* ssid = "iPhone_13 Pro_AEW";
+const char* password = "Gmylelqbln05+";
 
-#define COLOR_ORDER GRB
-#define CHIPSET WS2811
+// HiveMQ Cloud (TLS, Auth)
+const char* mqtt_server = "7a5f0484e9d74e10a592ae63a46e1a48.s1.eu.hivemq.cloud";  // z. B. abc123.hivemq.cloud
+const int mqtt_port = 8883;                                                       // TLS
+const char* mqtt_user = "Lenz_Wensink_ESP";
+const char* mqtt_pass = "kaxgAv-baqma5-cybdup";
 
-#define BRIGHTNESS 50
+const char* mqtt_topic = "PingPong";
+const char* client_id = "esp32-secure-client";
 
-const uint8_t kMatrixWidth = 32;
-const uint8_t kMatrixHeight = 16;
+WiFiClientSecure secureClient;
+PubSubClient client(secureClient);
 
-const bool kMatrixSerpentineLayout = true;
-const bool kMatrixVertical = true;
-
-
-#define TOTAL_LED_COUNT (kMatrixWidth * kMatrixHeight)
-CRGB leds_plus_safety_pixel[TOTAL_LED_COUNT + 2];
-CRGB* const ledsUpper(leds_plus_safety_pixel + 1);
-CRGB* const ledsLower(leds_plus_safety_pixel + 1 + TOTAL_LED_COUNT / 2);
-
-int i = 0;
-
-void setup() {
-  Serial.begin(9600);
-  delay(1000);
-  Serial.println("BEGINNING");
-  FastLED.addLeds<CHIPSET, LED_PIN_UPPER, COLOR_ORDER>(ledsUpper, TOTAL_LED_COUNT / 2).setCorrection(TypicalSMD5050);
-  FastLED.addLeds<CHIPSET, LED_PIN_LOWER, COLOR_ORDER>(ledsLower, TOTAL_LED_COUNT / 2).setCorrection(TypicalSMD5050);
-  FastLED.setBrightness(BRIGHTNESS);
-}
-void loop() {
-  delay(20);
-  clear();
-  setLed(5, 5, i, 255, 255);
-  i++;
-  LEDS.show();
+void connectToWiFi() {
+  Serial.print("Verbinde mit WLAN");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWLAN verbunden. IP: " + WiFi.localIP().toString());
 }
 
-
-
-void setLed(int x, int y, int H, int S, int V) {
-  if (y >= 16 || x >= 32 || y < 0 || x < 0) {  //if we are out of range
-    //Serial.println("--- INDEX OUT OF RANGE ---");
-    return;
-  }
-
-  int index = 0;
-  bool upper = false;  //wether we need to use the upper / lower panel for setting the pixel
-
-  if (y <= 7) {
-    upper = false;         //lower Panel
-    index = (31 - x) * 8;  //value for the 8 pixel packs
-  } else {
-    upper = true;   //we're on the upper panel
-    index = x * 8;  //so we can directly multiply the eight packs into the index
-    y = y - 8;      //we have to subtract that from y because we use the same Logic for the upper and the lower Panel in the next part
-  }
-
-  if (x % 2 == 0) {  //when it is zero, the original pixel index counts down, so we need to invert the y value. (This is true for both panels)
-    index += 7 - y;
-  } else {  // otherwise we may just add it up, thus the original pixel count direction looks the coordinate system's way (up)
-    index += y;
-  }
-
-  // now we got the pixel index.
-
-  if (upper) {
-    ledsUpper[index] = CHSV(H, S, V);
-  } else {
-    ledsLower[index] = CHSV(H, S, V);
-  }
-}
-
-void clear() {
-  for (int x = 0; x < 32; x++) {
-    for (int y = 0; y < 16; y++) {
-      setLed(x, y, 0, 0, 0);
+void reconnectMQTT() {
+  while (!client.connected()) {
+    Serial.print("Verbinde mit MQTT...");
+    if (client.connect(client_id, mqtt_user, mqtt_pass)) {
+      Serial.println(" verbunden.");
+      client.subscribe(mqtt_topic);
+    } else {
+      Serial.print("Fehler: ");
+      Serial.println(client.state());
+      delay(5000);
     }
   }
 }
+
+/*
+length: laenge in bytes
+*/
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Nachricht empfangen [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  for (unsigned int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+}
+
+void setup() {
+  Serial.begin(115200);
+  connectToWiFi();
+
+  // UNSICHER (zum Testen): Keine Zertifikatsprüfung
+  secureClient.setInsecure();
+
+  // Alternative (sicher): eigenes Root-CA-Zertifikat setzen
+  // secureClient.setCACert(yourRootCA);  // z. B. als PEM-String
+
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnectMQTT();
+  }
+  client.loop();
+
+  static unsigned long lastMsg = 0;
+  if (millis() - lastMsg > 10000) {
+    lastMsg = millis();
+    int position = 2;
+    String msg = WiFi.macAddress() + " " + position;
+    Serial.println(msg);
+    client.publish(mqtt_topic, msg.c_str());
+  }
+}
+
+
