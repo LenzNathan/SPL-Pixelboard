@@ -1,88 +1,100 @@
 #include <WiFi.h>
 #include <time.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_NeoMatrix.h>
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
+#include <LEDMatrix.h>
+#include <LEDText.h>
 
 // WLAN-Zugangsdaten
-const char* wlanName = "DEIN_WIFI_NAME";
-const char* wlanPasswort = "DEIN_WIFI_PASSWORT";
 
-// NTP-Server und Zeitzone
+const char* wlanName = "iPhone_13 Pro_AEW";
+const char* wlanPasswort = "Gmylelqbln05+";
+
+// NTP-Konfiguration
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset = 3600;       // GMT+1 (MEZ)
-const int daylightOffset = 3600;   // Sommerzeit
+const long gmtOffset = 3600;      // MEZ
+const int daylightOffset = 3600;  // Sommerzeit
 
-// LED-Matrix Setup (16 hoch, 32 breit)
-#define PIN_MATRIX 25
+// Panel-Größe (einzeln)
+#define PANEL_WIDTH 32
+#define PANEL_HEIGHT 8
 
-Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(
-  32, 16, PIN_MATRIX,
-  NEO_MATRIX_TOP + NEO_MATRIX_LEFT + NEO_MATRIX_ROWS + NEO_MATRIX_ZIGZAG,
-  NEO_GRB + NEO_KHZ800
-);
+// Gesamtmatrix
+#define MATRIX_WIDTH 32
+#define MATRIX_HEIGHT 16
 
+// Anzahl LEDs insgesamt
+#define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT)
+
+// Pins
+#define DATA_PIN 25  // Du kannst beide Panels an einem Pin mit entsprechendem Layout verkabeln
+
+// LED-Array
+CRGB leds[NUM_LEDS];
+
+// Matrix-Layout
+// 2 Panels à 32x8 übereinander => 32x16 Gesamtmatrix
+// Mapping: Serpentin-Zickzack, horizontal, first panel at top
+cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, HORIZONTAL_ZIGZAG_MATRIX> ledMatrix(leds);
+
+// LEDText-Objekt
+cLEDText scrollText;
+
+// Setup
 void setup() {
   Serial.begin(115200);
-  delay(1000);
+
+  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+  FastLED.setBrightness(20);
 
   verbindeMitWLAN();
   konfiguriereZeit();
 
-  matrix.begin();
-  matrix.setBrightness(20);  // Helligkeit (0–255)
-  matrix.setTextWrap(false);
-  matrix.setTextColor(matrix.Color(0, 255, 0));  // Grün
-  matrix.fillScreen(0);
-  matrix.show();
+  scrollText.SetFont(ScrollFont5x7);  // Verwende die eingebaute 5x7-Schrift
+  scrollText.Init(&ledMatrix, ledMatrix.Width(), ledMatrix.Height(), 0, 0);
+  scrollText.SetTextDirection(CHAR_DIRECTION_LEFT);  // statisch mittig setzen wir später
 }
 
+// Loop
 void loop() {
-  zeigeZeitAufMatrix();
-  delay(1000);  // Jede Sekunde aktualisieren
+  zeigeZeit();
+  delay(1000);
 }
 
+// WLAN verbinden
 void verbindeMitWLAN() {
-  Serial.print("Verbinde mit WLAN: ");
-  Serial.println(wlanName);
-
   WiFi.begin(wlanName, wlanPasswort);
-
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-
   Serial.println("\nWLAN verbunden.");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
 }
 
+// Zeit konfigurieren
 void konfiguriereZeit() {
   configTime(gmtOffset, daylightOffset, ntpServer);
-  Serial.println("Zeitkonfiguration abgeschlossen.");
 }
 
-void zeigeZeitAufMatrix() {
+// Zeit anzeigen
+void zeigeZeit() {
   struct tm zeitinfo;
-
   if (!getLocalTime(&zeitinfo)) {
     Serial.println("Zeitabruf fehlgeschlagen.");
     return;
   }
 
-  // Zeit formatieren (HH:MM)
   char uhrzeit[6];
-  snprintf(uhrzeit, sizeof(uhrzeit), "%02d:%02d",
-           zeitinfo.tm_hour, zeitinfo.tm_min);
-
-  // Ausgabe im Seriellen Monitor
-  Serial.print("Uhrzeit: ");
+  snprintf(uhrzeit, sizeof(uhrzeit), "%02d:%02d", zeitinfo.tm_hour, zeitinfo.tm_min);
   Serial.println(uhrzeit);
 
-  // Anzeige auf Matrix
-  matrix.fillScreen(0);
-  matrix.setCursor(1, 4);  // X,Y-Position für zentrierten Text
-  matrix.print(uhrzeit);
-  matrix.show();
+  // Bildschirm löschen
+  ledMatrix.clear();
+
+  // Text vorbereiten
+  scrollText.setText((unsigned char*)uhrzeit, scrollText.CenterText((unsigned char*)uhrzeit));
+  scrollText.setTextColor(CRGB::Green);
+
+  // Text zeichnen
+  scrollText.UpdateText();
+  FastLED.show();
 }
