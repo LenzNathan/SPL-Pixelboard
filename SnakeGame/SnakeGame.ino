@@ -100,6 +100,7 @@ int legendaryColorUpdateTime = 50;
 unsigned long legendaryColorUpdateTimer = 0;
 
 void setup() {
+  randomSeed(analogRead(0));
   Serial.begin(9600);
   delay(1000);
   Serial.println("BEGINNING");
@@ -432,7 +433,6 @@ void resetSnake() {
 }
 
 void newApple() {
-  randomSeed(analogRead(0));
   bool granted = false;
   while (!granted) {
     apple = Position{ random(1, 30), random(1, 15) };

@@ -4,6 +4,27 @@
 #include <LEDMatrix.h>
 #include <LEDText.h>
 
+//LED zeugs
+#define LED_PIN_UPPER 25
+#define LED_PIN_LOWER 26
+
+#define COLOR_ORDER GRB
+#define CHIPSET WS2811
+
+#define BRIGHTNESS 50
+
+const uint8_t kMatrixWidth = 32;
+const uint8_t kMatrixHeight = 16;
+
+const bool kMatrixSerpentineLayout = true;
+const bool kMatrixVertical = true;
+
+
+#define TOTAL_LED_COUNT (kMatrixWidth * kMatrixHeight)
+CRGB leds_plus_safety_pixel[TOTAL_LED_COUNT + 2];
+CRGB* const ledsUpper(leds_plus_safety_pixel + 1);
+CRGB* const ledsLower(leds_plus_safety_pixel + 1 + TOTAL_LED_COUNT / 2);
+
 // WLAN-Zugangsdaten
 
 const char* wlanName = "iPhone_13 Pro_AEW";
@@ -34,7 +55,7 @@ CRGB leds[NUM_LEDS];
 // Matrix-Layout
 // 2 Panels à 32x8 übereinander => 32x16 Gesamtmatrix
 // Mapping: Serpentin-Zickzack, horizontal, first panel at top
-cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, HORIZONTAL_ZIGZAG_MATRIX> ledMatrix(leds);
+cLEDMatrix< MATRIX_WIDTH, MATRIX_HEIGHT, HORIZONTAL_ZIGZAG_MATRIX> ledMatrix(leds);
 
 // LEDText-Objekt
 cLEDText scrollText;
