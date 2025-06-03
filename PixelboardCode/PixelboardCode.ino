@@ -48,6 +48,9 @@ unsigned char humText[] = { "     %" };                           // Platzhalter
 
 
 
+unsigned long newPanelDataTime = 0;  //--- LED PANEL STEUERUNG
+
+
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                         TASTER-EINGABE                       ║
 // ║   Umschalten zwischen Tasks durch langen Tastendruck (Hold)  ║
@@ -69,6 +72,31 @@ TaskHandle_t handle_DHT22;
 
 void setup() {
   Serial.begin(9600);
+  dht.begin();  // DHT-Sensor initialisieren
+
+  // LEDs für Temperaturmatrix initialisieren
+  FastLED.addLeds<WS2812B, LED_PIN_TEMP, GRB>(ledsTemp[0], ledsTemp.Size());
+
+  // LEDs für Feuchtigkeitsmatrix initialisieren
+  FastLED.addLeds<WS2812B, LED_PIN_HUM, GRB>(ledsHum[0], ledsHum.Size());
+
+  FastLED.setBrightness(30);  // Helligkeit der LEDs setzen (0–255)
+  FastLED.clear(true);        // Alle LEDs auf schwarz setzen (initial)
+  FastLED.show();             // Änderungen an LED-Streifen anzeigen
+
+  // === Temperaturanzeige konfigurieren
+  textTemp.SetFont(MatriseFontData);                                            // Schriftart wählen
+  textTemp.Init(&ledsTemp, ledsTemp.Width(), textTemp.FontHeight() + 1, 0, 0);  // Position + Matrix binden
+  textTemp.SetText((unsigned char *)tempText, sizeof(tempText) - 1);            // Anfangstext setzen
+  textTemp.SetTextColrOptions(COLR_RGB | COLR_SINGLE, 0xFF, 0x00, 0x00);        // Textfarbe: Rot
+
+  // === Feuchtigkeitsanzeige konfigurieren
+  textHum.SetFont(MatriseFontData);                                         // Schriftart wählen
+  textHum.Init(&ledsHum, ledsHum.Width(), textHum.FontHeight() + 1, 0, 0);  // Position + Matrix binden
+  textHum.SetText((unsigned char *)humText, sizeof(humText) - 1);           // Anfangstext setzen
+  textHum.SetTextColrOptions(COLR_RGB | COLR_SINGLE, 0x00, 0x00, 0xFF);     // Textfarbe: Blau
+
+  //------ FREE RTOS TASKS DEFINITION ------//
   Serial.println("Starte FreeRTOS A-B Test");
   xTaskCreate(
     TaskA, "TaskA"  //name
@@ -83,10 +111,13 @@ void setup() {
   xTaskCreate(
     TaskDHT22,
     "TaskDHT22",
-    2048,
+    4096,
     NULL,
     1,
-    NULL);
+    &handle_DHT22);
+
+  vTaskSuspend(handle_DHT22);
+  //vTaskSuspend(&handle_a);
 }
 
 void loop() {
@@ -105,9 +136,13 @@ void loop() {
       vTaskSuspend(handle_a);     // Deaktiviere Task A
       vTaskResume(handle_DHT22);  // Aktiviere Task B
     }
+    FastLED.clear();
+    newPanelDataTime = millis();
   }
-
-  delay(1);  // Kleinste Entprellverzögerung
+  if (millis() - newPanelDataTime > 20) {
+    FastLED.show();
+  }
+  delay(20);  // Kleinste Entprellverzögerung
 }
 
 
@@ -121,6 +156,7 @@ void TaskA(void *pvParameters) {
 
 void TaskDHT22(void *pvParameters) {
   for (;;) {
+    newPanelDataTime = millis();
     float temperature = dht.readTemperature();
     float humidity = dht.readHumidity();
 
@@ -152,9 +188,6 @@ void TaskDHT22(void *pvParameters) {
       textHum.UpdateText();
       textTemp.UpdateText();
     }
-
-    FastLED.show();
     vTaskDelay(pdMS_TO_TICKS(1000));  // 1 Sekunde warten
   }
 }
-

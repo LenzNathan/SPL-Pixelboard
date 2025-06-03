@@ -16,15 +16,24 @@
 /// * 1 digit for the major version
 /// * 3 digits for the minor version
 /// * 3 digits for the patch version
-#define FASTLED_VERSION 3009017
+#define FASTLED_VERSION 3009019
 #ifndef FASTLED_INTERNAL
 #  ifdef  FASTLED_SHOW_VERSION
 #    ifdef FASTLED_HAS_PRAGMA_MESSAGE
-#      pragma message "FastLED version 3.009.017"
+#      pragma message "FastLED version 3.009.019"
 #    else
-#      warning FastLED version 3.009.017  (Not really a warning, just telling you here.)
+#      warning FastLED version 3.009.019  (Not really a warning, just telling you here.)
 #    endif
 #  endif
+#endif
+
+
+#if !defined(FASTLED_FAKE_SPI_FORWARDS_TO_FAKE_CLOCKLESS)
+#if defined(__EMSCRIPTEN__)
+#define FASTLED_FAKE_SPI_FORWARDS_TO_FAKE_CLOCKLESS 1
+#else
+#define FASTLED_FAKE_SPI_FORWARDS_TO_FAKE_CLOCKLESS 0
+#endif
 #endif
 
 #ifndef __PROG_TYPES_COMPAT__
@@ -457,6 +466,33 @@ public:
 	_FL_MAP_CLOCKED_CHIPSET(SK9822HD, SK9822ControllerHD)
 
 
+	#if FASTLED_FAKE_SPI_FORWARDS_TO_FAKE_CLOCKLESS
+	/// Stubbed out platforms have unique challenges in faking out the SPI based controllers.
+	/// Therefore for these platforms we will always delegate to the WS2812 clockless controller.
+	/// This is fine because the clockless controllers on the stubbed out platforms are fake anyways.
+	template<ESPIChipsets CHIPSET, uint8_t DATA_PIN, uint8_t CLOCK_PIN, EOrder RGB_ORDER, uint32_t SPI_DATA_RATE > CLEDController &addLeds(struct CRGB *data, int nLedsOrOffset, int nLedsIfOffset = 0) {
+		// Instantiate the controller using ClockedChipsetHelper
+		// Always USE WS2812 clockless controller since it's the common path.
+		return addLeds<WS2812, DATA_PIN, RGB_ORDER>(data, nLedsOrOffset, nLedsIfOffset);
+	}
+
+	/// Add an SPI based CLEDController instance to the world.
+	template<ESPIChipsets CHIPSET, uint8_t DATA_PIN, uint8_t CLOCK_PIN > static CLEDController &addLeds(struct CRGB *data, int nLedsOrOffset, int nLedsIfOffset = 0) {
+		// Always USE WS2812 clockless controller since it's the common path.
+		return addLeds<WS2812, DATA_PIN>(data, nLedsOrOffset, nLedsIfOffset);
+	}
+
+
+	// The addLeds function using ChipsetHelper
+	template<ESPIChipsets CHIPSET, uint8_t DATA_PIN, uint8_t CLOCK_PIN, EOrder RGB_ORDER>
+	CLEDController& addLeds(struct CRGB* data, int nLedsOrOffset, int nLedsIfOffset = 0) {
+		// Always USE WS2812 clockless controller since it's the common path.
+		return addLeds<WS2812, DATA_PIN, RGB_ORDER>(data, nLedsOrOffset, nLedsIfOffset);
+	}
+
+	#else
+
+
 	/// Add an SPI based CLEDController instance to the world.
 	template<ESPIChipsets CHIPSET, uint8_t DATA_PIN, uint8_t CLOCK_PIN, EOrder RGB_ORDER, uint32_t SPI_DATA_RATE > CLEDController &addLeds(struct CRGB *data, int nLedsOrOffset, int nLedsIfOffset = 0) {
 		// Instantiate the controller using ClockedChipsetHelper
@@ -486,6 +522,7 @@ public:
 		static ControllerTypeWithOrder c;
 		return addLeds(&c, data, nLedsOrOffset, nLedsIfOffset);
 	}
+	#endif
 
 
 #ifdef SPI_DATA
