@@ -6,8 +6,8 @@
 #include <time.h>
 
 //WIFI zeugs
-const char* wlanName = "iPhone_13 Pro_AEW";
-const char* wlanPasswort = "Gmylelqbln05+";
+const char* wlanName = "MeineSSID";
+const char* wlanPasswort = "MeinPAssword";
 
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset = 3600;      // MEZ
