@@ -10,7 +10,7 @@
 
 #define BRIGHTNESS 50
 
-const uint8_t kMatrixWidth = 32;
+const uint8_t kMatrixWidth = -32;
 const uint8_t kMatrixHeight = 16;
 
 const bool kMatrixSerpentineLayout = true;
@@ -18,9 +18,7 @@ const bool kMatrixVertical = true;
 
 
 #define TOTAL_LED_COUNT (kMatrixWidth * kMatrixHeight)
-// CRGB leds_plus_safety_pixel[TOTAL_LED_COUNT + 2];
-// CRGB* const ledsUpper(leds_plus_safety_pixel + 1);
-// CRGB* const ledsLower(leds_plus_safety_pixel + 1 + TOTAL_LED_COUNT / 2);
+
 
 CRGB ledsRawUpper[(TOTAL_LED_COUNT / 2) + 2];
 CRGB ledsRawLower[(TOTAL_LED_COUNT / 2) + 2];
