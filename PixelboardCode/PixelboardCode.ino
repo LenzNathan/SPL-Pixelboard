@@ -13,6 +13,10 @@
 
 
 
+
+
+
+
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                      DHT22 SENSOR-AUSGABE                    ║
 // ║         Temperatur (°C) und Luftfeuchtigkeit (%) anzeigen    ║
@@ -69,6 +73,21 @@ bool aTaskActive = true;
 
 TaskHandle_t handle_a;
 TaskHandle_t handle_DHT22;
+
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║                         Urhzeit                              ║
+// ║                     Uhrzeit anzeigen, WLAN, ...              ║
+// ╚══════════════════════════════════════════════════════════════╝
+const char* wlanName = "iPhone_13 Pro_AEW";
+const char* wlanPasswort = "Gmylelqbln05+";
+
+// NTP-Konfiguration
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset = 3600;      // MEZ
+const int daylightOffset = 3600;  // Sommerzeit
+
+
 
 void setup() {
   Serial.begin(9600);
@@ -191,3 +210,9 @@ void TaskDHT22(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(1000));  // 1 Sekunde warten
   }
 }
+
+void TastTime() {
+  zeigeZeit();
+  delay(1000);
+}
+
