@@ -9,13 +9,35 @@
 #include <LEDText.h>      // Textausgabe auf LED-Matrix (Scroll, Anzeige, etc.)
 #include <FontMatrise.h>  // Schriftart für LEDText
 #include <DHT.h>          // Bibliothek zur Kommunikation mit DHT-Sensoren
+#include <WiFi.h>
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║                            Structs                           ║
+// ║                           und Farben                         ║
+// ╚══════════════════════════════════════════════════════════════╝
 
+struct Color {
+  int H;
+  int S;
+  int V;
+};
 
+struct Position {
+  int x;
+  int y;
+};
 
-
-
-
+//Farben
+Color snakeHead = Color{ 150, 255, 255 };
+Color snakeBody = Color{ 125, 255, 255 };
+Color movementPointColor = Color{ 60, 255, 255 };
+Color movementSkillPointColor = Color{ 60, 255, 150 };
+Color applePointColor = Color{ 105, 255, 255 };
+Color appleSkillPointColor = Color{ 105, 255, 150 };
+Color legendaryColor = Color{ 0, 255, 255 };  // updaten --> Regenbogen
+Color white = Color{ 0, 0, 255 };
+Color red = Color{ 255, 255, 255 };
+Color black = Color{ 0, 0, 0 };
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                      DHT22 SENSOR-AUSGABE                    ║
@@ -38,6 +60,11 @@ cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> ledsTemp;  // Matrixobjekt 
 cLEDText textTemp;                                              // Textobjekt für Temperaturanzeige
 unsigned char tempText[] = { "     C" };                        // Platzhalter-Text für Temperatur
 
+int h = 0;
+int m = 0;
+cLEDText ClockTime;
+unsigned char TxtDemo[] = { "   :  " };
+
 // === LED-Matrix 2: Feuchtigkeitsanzeige
 #define LED_PIN_HUM 26                       // Datenpin für untere Matrix (Feuchtigkeit)
 #define MATRIX_WIDTH2 -32                    // Negativer Wert = X-Richtung gespiegelt
@@ -48,11 +75,14 @@ cLEDMatrix<MATRIX_WIDTH2, MATRIX_HEIGHT2, MATRIX_TYPE2> ledsHum;  // Matrixobjek
 cLEDText textHum;                                                 // Textobjekt für Feuchtigkeit
 unsigned char humText[] = { "     %" };                           // Platzhalter-Text für Feuchtigkeit
 
-
-
+int day = 0;
+int month = 0;
+cLEDText Date;
+unsigned char DateText[] = { "   .  " };
 
 
 unsigned long newPanelDataTime = 0;  //--- LED PANEL STEUERUNG
+#define TOTAL_LED_COUNT (32 * 16)
 
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -68,24 +98,27 @@ Joystick taster(tasterPin, 50);
 
 void TaskA(void *pvParameters);
 void TaskDHT22(void *pvParameters);
+void TaskTime(void *pvParameters);
 
-bool aTaskActive = true;
+int aTaskActive = 1;
 
 TaskHandle_t handle_a;
 TaskHandle_t handle_DHT22;
+TaskHandle_t handle_Time;
 
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                         Urhzeit                              ║
 // ║                     Uhrzeit anzeigen, WLAN, ...              ║
 // ╚══════════════════════════════════════════════════════════════╝
-const char* wlanName = "iPhone_13 Pro_AEW";
-const char* wlanPasswort = "Gmylelqbln05+";
+const char *wlanName = "iPhone_13 Pro_AEW";
+const char *wlanPasswort = "Gmylelqbln05+";
 
 // NTP-Konfiguration
-const char* ntpServer = "pool.ntp.org";
+const char *ntpServer = "pool.ntp.org";
 const long gmtOffset = 3600;      // MEZ
 const int daylightOffset = 3600;  // Sommerzeit
+
 
 
 
@@ -115,6 +148,16 @@ void setup() {
   textHum.SetText((unsigned char *)humText, sizeof(humText) - 1);           // Anfangstext setzen
   textHum.SetTextColrOptions(COLR_RGB | COLR_SINGLE, 0x00, 0x00, 0xFF);     // Textfarbe: Blau
 
+  ClockTime.SetFont(MatriseFontData);
+  ClockTime.Init(&ledsTemp, ledsTemp.Width(), ClockTime.FontHeight() + 1, 0, 0);
+  ClockTime.SetText((unsigned char *)TxtDemo, sizeof(TxtDemo) - 1);
+  ClockTime.SetTextColrOptions(COLR_RGB | COLR_SINGLE, 0xff, 0x00, 0xff);
+
+  Date.SetFont(MatriseFontData);
+  Date.Init(&ledsHum, ledsHum.Width(), Date.FontHeight() + 1, 0, 0);
+  Date.SetText((unsigned char *)DateText, sizeof(DateText) - 1);
+  Date.SetTextColrOptions(COLR_RGB | COLR_SINGLE, 0xff, 0x00, 0xff);
+
   //------ FREE RTOS TASKS DEFINITION ------//
   Serial.println("Starte FreeRTOS A-B Test");
   xTaskCreate(
@@ -134,8 +177,16 @@ void setup() {
     NULL,
     1,
     &handle_DHT22);
+  xTaskCreate(
+    TaskTime,
+    "TaskTime",
+    4096,
+    NULL,
+    1,
+    &handle_Time);
 
   vTaskSuspend(handle_DHT22);
+  vTaskSuspend(handle_Time);
   //vTaskSuspend(&handle_a);
 }
 
@@ -146,14 +197,30 @@ void loop() {
 
   if (taster.LangerKlick()) {
     Serial.println("Langer Klick erkannt!");
-    aTaskActive = !aTaskActive;
+    aTaskActive++;
 
-    if (aTaskActive) {
-      vTaskSuspend(handle_DHT22);  // Deaktiviere Task B
-      vTaskResume(handle_a);       // Aktiviere Task A
-    } else {
-      vTaskSuspend(handle_a);     // Deaktiviere Task A
-      vTaskResume(handle_DHT22);  // Aktiviere Task B
+    switch (aTaskActive) {
+      case 1:
+        vTaskSuspend(handle_DHT22);  // Deaktiviere Task B
+        vTaskSuspend(handle_Time);
+        vTaskResume(handle_a);  // Aktiviere Task A
+        break;
+      case 2:
+        vTaskSuspend(handle_a);  // Deaktiviere Task A
+        vTaskSuspend(handle_Time);
+        vTaskResume(handle_DHT22);  // Aktiviere Task B
+        break;
+      case 3:
+        vTaskSuspend(handle_a);
+        vTaskSuspend(handle_DHT22);
+        clear();
+        delay(20);
+        FastLED.show();
+        verbindeMitWLAN();
+        konfiguriereZeit();
+        vTaskResume(handle_Time);
+        aTaskActive = 0;
+        break;
     }
     FastLED.clear();
     newPanelDataTime = millis();
@@ -161,7 +228,7 @@ void loop() {
   if (millis() - newPanelDataTime > 20) {
     FastLED.show();
   }
-  delay(20);  // Kleinste Entprellverzögerung
+  delay(20);
 }
 
 
@@ -175,7 +242,6 @@ void TaskA(void *pvParameters) {
 
 void TaskDHT22(void *pvParameters) {
   for (;;) {
-    newPanelDataTime = millis();
     float temperature = dht.readTemperature();
     float humidity = dht.readHumidity();
 
@@ -193,6 +259,7 @@ void TaskDHT22(void *pvParameters) {
     Serial.println(" %");
 
     // Temperaturanzeige vorbereiten
+    newPanelDataTime = millis();
     snprintf((char *)tempText, sizeof(tempText), "%5.1fC", temperature);
     textTemp.SetText(tempText, strlen((char *)tempText));
     textTemp.UpdateText();
@@ -211,8 +278,118 @@ void TaskDHT22(void *pvParameters) {
   }
 }
 
-void TastTime() {
-  zeigeZeit();
-  delay(1000);
+void TaskTime(void *pvParameters) {
+  for (;;) {
+    struct tm zeitinfo;
+    if (!getLocalTime(&zeitinfo)) {
+      Serial.println("Zeitabruf fehlgeschlagen.");
+    }
+
+    newPanelDataTime = millis();
+    Date.SetText((unsigned char *)DateText, sizeof(DateText) - 1);
+    ClockTime.SetText((unsigned char *)TxtDemo, sizeof(TxtDemo) - 1);
+
+    ClockTime.UpdateText();  //Anzeigen
+    Date.UpdateText();       //Anzeigen
+    for (int i = 0; i < 5; i++) {
+      ClockTime.UpdateText();  //um eins verschieben, weil 6*5 = 30 pixel, von 32 Pixel macht 1 Pixel Abstand / Seite
+      Date.UpdateText();
+    }
+
+    String hours = String(h);
+    if (h < 10) {
+      hours = "0" + hours;
+    }
+    String minutes = String(m);
+    if (m < 10) {
+      minutes = "0" + minutes;
+    }
+
+    String dayString = String(day);
+    if (day < 10) {
+      dayString = "0" + dayString;
+    }
+    String monthString = String(month);
+    if (month < 10) {
+      monthString = "0" + monthString;
+    }
+
+    for (int i = 0; i < 2; i++) {
+      TxtDemo[i + 1] = hours[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      TxtDemo[i + 4] = minutes[i];
+    }
+
+    for (int i = 0; i < 2; i++) {
+      DateText[i + 1] = dayString[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      DateText[i + 4] = monthString[i];
+    }
+    delay(1000);
+    h = zeitinfo.tm_hour;
+    m = zeitinfo.tm_min;
+    day = zeitinfo.tm_mday;
+    month = zeitinfo.tm_mon + 1;
+  }
 }
 
+void verbindeMitWLAN() {
+  WiFi.begin(wlanName, wlanPasswort);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWLAN verbunden.");
+}
+
+void konfiguriereZeit() {
+  configTime(gmtOffset, daylightOffset, ntpServer);
+}
+
+void clear() {
+  for (int x = 0; x < 32; x++) {
+    for (int y = 0; y < 16; y++) {
+      setLed(x, y, black);
+    }
+  }
+}
+
+void setLed(int x, int y, Color color) {
+  if (y >= 16 || x >= 32 || x < 0 || y < 0) {  //if we are out of range
+    //Serial.println("--- INDEX OUT OF RANGE ---");
+    return;
+  }
+
+  int index = 0;
+  bool upper = false;  //wether we need to use the upper / lower panel for setting the pixel
+
+  if (y <= 7) {
+    upper = false;         //lower Panel
+    index = (31 - x) * 8;  //value for the 8 pixel packs
+  } else {
+    upper = true;   //we're on the upper panel
+    index = x * 8;  //so we can directly multiply the eight packs into the index
+    y = y - 8;      //we have to subtract that from y because we use the same Logic for the upper and the lower Panel in the next part
+  }
+
+  if (x % 2 == 0) {  //when it is zero, the original pixel index counts down, so we need to invert the y value. (This is true for both panels)
+    index += 7 - y;
+  } else {  // otherwise we may just add it up, thus the original pixel count direction looks the coordinate system's way (up)
+    index += y;
+  }
+
+  // now we got the pixel index.
+  if (index < 0 || index >= TOTAL_LED_COUNT / 2) {
+    Serial.print("Invalid index!");
+    Serial.println(index);
+    return;
+  }
+
+  if (upper) {
+    ledsTemp(index) = CHSV(color.H, color.S, color.V);
+  } else {
+    ledsHum(index) = CHSV(color.H, color.S, color.V);
+  }
+}

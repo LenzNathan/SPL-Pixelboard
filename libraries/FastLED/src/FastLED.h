@@ -16,13 +16,13 @@
 /// * 1 digit for the major version
 /// * 3 digits for the minor version
 /// * 3 digits for the patch version
-#define FASTLED_VERSION 3009019
+#define FASTLED_VERSION 3009020
 #ifndef FASTLED_INTERNAL
 #  ifdef  FASTLED_SHOW_VERSION
 #    ifdef FASTLED_HAS_PRAGMA_MESSAGE
-#      pragma message "FastLED version 3.009.019"
+#      pragma message "FastLED version 3.009.020"
 #    else
-#      warning FastLED version 3.009.019  (Not really a warning, just telling you here.)
+#      warning FastLED version 3.009.020  (Not really a warning, just telling you here.)
 #    endif
 #  endif
 #endif
@@ -948,9 +948,6 @@ using namespace fl;
 #endif
 
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcomment"
-
 // Experimental: loop() hijacking.
 //
 // EngineEvents requires that FastLED.show() be invoked.
@@ -964,10 +961,10 @@ using namespace fl;
 //
 // It's possible to hijack the loop() via a macro so that
 // extra code can be injected at the start of every frame.
-// 
-// #define loop() \
-//     real_loop(); \
-//     void loop() { FASTLED_WARN("hijacked the loop"); real_loop(); } \
-//     void real_loop()
 
-#pragma GCC diagnostic pop
+#if 0
+#define loop() \
+     real_loop(); \
+     void loop() { FASTLED_WARN("hijacked the loop"); real_loop(); } \
+     void real_loop()
+#endif

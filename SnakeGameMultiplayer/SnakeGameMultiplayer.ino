@@ -162,7 +162,7 @@ void loop() {
     reconnectMQTT();
   }
   client.loop();
-  
+
   if (millis() - legendaryColorUpdateTimer > legendaryColorUpdateTime) {  //Farbe updaten
     legendaryColorUpdateTimer = millis();
     legendaryColor.H = legendaryColor.H + 5;
@@ -616,4 +616,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
     msg += (char)payload[i];
   }
   Serial.println(msg);
+  if (msg == "UP" && snakeDir != Direction::down) {
+    newDir = Direction::up;
+  } else if (msg == "DOWN" && snakeDir != Direction::up) {
+    newDir = Direction::down;
+  } else if (msg == "LEFT" && snakeDir != Direction::right) {
+    newDir = Direction::left;
+  } else if (msg == "RIGHT" && snakeDir != Direction::up && snakeDir != Direction::none) {
+    newDir = Direction::right;
+  }
 }

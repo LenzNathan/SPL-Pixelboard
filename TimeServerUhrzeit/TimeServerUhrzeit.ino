@@ -6,8 +6,8 @@
 #include <time.h>
 
 //WIFI zeugs
-const char* wlanName = "MeineSSID";
-const char* wlanPasswort = "MeinPAssword";
+const char* wlanName = "SSID";
+const char* wlanPasswort = "PWD";
 
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset = 3600;      // MEZ
@@ -19,14 +19,14 @@ const int daylightOffset = 3600;  // Sommerzeit
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812B
 
-#define MATRIX_WIDTH -32
+#define MATRIX_WIDTH 32
 #define MATRIX_HEIGHT -8
 #define MATRIX_TYPE VERTICAL_ZIGZAG_MATRIX
 
 int h = 0;
 int m = 0;
 
-cLEDMatrix<-MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
+cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 
 cLEDText ClockTime;
 
@@ -38,14 +38,14 @@ unsigned char TxtDemo[] = { "   :  " };
 #define COLOR_ORDER2 GRB
 #define CHIPSET2 WS2812B
 
-#define MATRIX_WIDTH2 32
+#define MATRIX_WIDTH2 -32
 #define MATRIX_HEIGHT2 8
 #define MATRIX_TYPE2 VERTICAL_ZIGZAG_MATRIX
 
 int day = 0;
 int month = 0;
 
-cLEDMatrix<-MATRIX_WIDTH2, MATRIX_HEIGHT2, MATRIX_TYPE2> leds2;
+cLEDMatrix<MATRIX_WIDTH2, MATRIX_HEIGHT2, MATRIX_TYPE2> leds2;
 
 cLEDText Date;
 
