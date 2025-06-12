@@ -723,6 +723,7 @@ void resetGame(bool inGameReset) {
   movementSkillPoints = 0;
   applePoints = 0;
   appleSkillPoints = 0;
+  boost = false;
   newApple();
   Serial.println("Resetted");
 }
