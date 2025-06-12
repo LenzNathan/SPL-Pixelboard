@@ -239,7 +239,7 @@ void loop() {
   if (aTaskActive != 0) {
     taster.aktualisieren();
   }
-  
+
   if (taster.LangerKlick()) {
     Serial.println("Langer Klick erkannt!");
     aTaskActive++;
@@ -402,8 +402,8 @@ void TaskTime(void *pvParameters) {
 void TaskSnake(void *pvParameters) {
   resetGame(false);
   for (;;) {
-    taster.aktualisieren();
     bool tasterLastState = taster.istGedrueckt();
+    taster.aktualisieren();
     if (millis() - legendaryColorUpdateTimer > legendaryColorUpdateTime) {  //Farbe updaten
       legendaryColorUpdateTimer = millis();
       legendaryColor.H = legendaryColor.H + 5;
