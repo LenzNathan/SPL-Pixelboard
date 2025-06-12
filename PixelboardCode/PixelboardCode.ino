@@ -22,6 +22,7 @@ int gameoverBlinkPointDelay = 3000;
 unsigned long gameoverBlinkTimer = 0;
 bool gameoverPointScreen = true;
 bool snakeOnSelf = false;
+bool boost = false;
 
 enum Direction {
   none,
@@ -426,7 +427,10 @@ void TaskSnake(void *pvParameters) {
       }
       //move Snake
       int actualSnakeDelay = snakeMoveDelay;
-      if (taster.istGedrueckt()) {
+      if (!tasterLastState && taster.istGedrueckt()) {
+        boost = !boost;
+      }
+      if (boost) {
         actualSnakeDelay = actualSnakeDelay * 2 / 3;
         if (actualSnakeDelay > minSnakeMoveDelay) {
           actualSnakeDelay = minSnakeMoveDelay;
